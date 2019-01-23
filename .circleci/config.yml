@@ -1,7 +1,7 @@
 version: 2
 jobs:
   build:
-    working_directory: ~/Clever/analytics-util
+    working_directory: /go/src/github.com/Clever/analytics-util
     docker:
     - image: circleci/golang:1.10.7-stretch
     environment:

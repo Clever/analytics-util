@@ -2,7 +2,7 @@
 
 Helpers for analytics workers
 
-Owned by TODO
+Owned by eng-deip
 
 ## Deploying
 

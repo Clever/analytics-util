@@ -1,9 +1,9 @@
 version: 2
 jobs:
   build:
-    working_directory: ~/Clever/analytics-util
+    working_directory: /go/src/github.com/Clever/analytics-util
     docker:
-    - image: circleci/buildpack-deps:18.04
+    - image: circleci/golang:1.10.7-stretch
     environment:
       CIRCLE_ARTIFACTS: /tmp/circleci-artifacts
       CIRCLE_TEST_REPORTS: /tmp/circleci-test-results
@@ -16,7 +16,6 @@ jobs:
     - run:
         command: mkdir -p $CIRCLE_ARTIFACTS $CIRCLE_TEST_REPORTS
         name: Set up CircleCI artifacts directories
-    - run: make build
+    - run: make install_deps
     - run: make test
-    - run: $HOME/ci-scripts/circleci/docker-publish $DOCKER_USER $DOCKER_PASS "$DOCKER_EMAIL" $DOCKER_ORG
-    - run: $HOME/ci-scripts/circleci/catapult-publish $CATAPULT_URL $CATAPULT_USER $CATAPULT_PASS $APP_NAME
+    - run: if [ "${CIRCLE_BRANCH}" == "master" ]; then $HOME/ci-scripts/circleci/github-release $GH_RELEASE_TOKEN; fi;

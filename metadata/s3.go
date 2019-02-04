@@ -16,15 +16,16 @@ type FieldType string
 
 // Currently supported field types
 const (
-	String    FieldType = "string"
-	Integer   FieldType = "integer"
 	Boolean   FieldType = "boolean"
+	Integer   FieldType = "integer"
+	MongoID   FieldType = "mongo_id"
+	String    FieldType = "string"
 	Timestamp FieldType = "timestamp"
 )
 
 // S3MetaData represents all the information we want to add to an analytics object for future reference
 // See User-Defined metadata in:
-// https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html#object-metadata
+// https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetaData.html#object-metadata
 type S3MetaData struct {
 	SchemaName    *string `json:"x-amz-meta-schema-name"`
 	TableName     *string `json:"x-amz-meta-table-name"`
@@ -34,8 +35,13 @@ type S3MetaData struct {
 	fieldTypesArr []FieldType
 }
 
-// NewMetadata ...
-func NewMetadata(schema, table string, fieldNames []string, fieldTypes []FieldType) *S3MetaData {
+func newS3MetaData(schema, table string, fields map[string]FieldType) *S3MetaData {
+	var fieldNames []string
+	var fieldTypes []FieldType
+	for k, v := range fields {
+		fieldNames = append(fieldNames, k)
+		fieldTypes = append(fieldTypes, v)
+	}
 	return &S3MetaData{
 		SchemaName:    &schema,
 		TableName:     &table,
@@ -44,8 +50,14 @@ func NewMetadata(schema, table string, fieldNames []string, fieldTypes []FieldTy
 	}
 }
 
-// NewMetadataFromMap returns a metadata object constructed from the S3 sdk
-func NewMetadataFromMap(metadata map[string]*string) (*S3MetaData, error) {
+// GenerateS3MetaData returns a metadata object for use by the S3 sdk
+func GenerateS3MetaData(schema, table string, fields map[string]FieldType) (map[string]*string, error) {
+	s := newS3MetaData(schema, table, fields)
+	return s.ConvertToS3SDKFormat()
+}
+
+// NewS3MetaDataFromSDKMap returns a metadata object constructed from the S3 sdk
+func NewS3MetaDataFromSDKMap(metadata map[string]*string) (*S3MetaData, error) {
 	b, err := json.Marshal(metadata)
 	if err != nil {
 		return nil, err
@@ -63,8 +75,8 @@ func NewMetadataFromMap(metadata map[string]*string) (*S3MetaData, error) {
 	return &m, nil
 }
 
-// ToMap converts the S3MetaData to the type expected by the S3 sdk
-func (m *S3MetaData) ToMap() (map[string]*string, error) {
+// ConvertToS3SDKFormat converts the S3MetaData to the map expected by the S3 sdk
+func (m *S3MetaData) ConvertToS3SDKFormat() (map[string]*string, error) {
 	m.fieldNamesToString()
 	m.fieldTypesToString()
 	if err := m.validate(); err != nil {

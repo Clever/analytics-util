@@ -20,7 +20,7 @@ var (
 	testFieldType = "string"
 )
 
-func TestNewMetadataFromMap(t *testing.T) {
+func TestNewS3MetaDataFromMap(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    map[string]*string
@@ -47,23 +47,32 @@ func TestNewMetadataFromMap(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewMetadataFromMap(tt.args)
+			got, err := NewS3MetaDataFromSDKMap(tt.args)
 			require.Equal(t, tt.want, got)
 			require.Equal(t, tt.wantErr, err != nil)
 		})
 	}
 }
 
-func TestS3MetaData_ToMap(t *testing.T) {
+func TestS3MetaData_ConvertToS3SDKFormat(t *testing.T) {
+	type args struct {
+		table  string
+		schema string
+		fields map[string]FieldType
+	}
 	tests := []struct {
-		name     string
-		metadata *S3MetaData
-		want     map[string]*string
-		wantErr  bool
+		name    string
+		args    args
+		want    map[string]*string
+		wantErr bool
 	}{
 		{
-			name:     "working case",
-			metadata: NewMetadata(testSchema, testTable, []string{testFieldID}, []FieldType{String}),
+			name: "working case",
+			args: args{
+				table:  testTable,
+				schema: testSchema,
+				fields: map[string]FieldType{testFieldID: String},
+			},
 			want: map[string]*string{
 				mSchema:     &testSchema,
 				mTable:      &testTable,
@@ -74,7 +83,7 @@ func TestS3MetaData_ToMap(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.metadata.ToMap()
+			got, err := GenerateS3MetaData(tt.args.schema, tt.args.table, tt.args.fields)
 			require.Equal(t, tt.want, got)
 			require.Equal(t, tt.wantErr, err != nil)
 		})

@@ -27,26 +27,18 @@ const (
 // See User-Defined metadata in:
 // https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetaData.html#object-metadata
 type S3MetaData struct {
-	SchemaName    *string `json:"x-amz-meta-schema-name"`
-	TableName     *string `json:"x-amz-meta-table-name"`
-	FieldNames    *string `json:"x-amz-meta-field-names"`
-	FieldTypes    *string `json:"x-amz-meta-field-types"`
-	fieldNamesArr []string
-	fieldTypesArr []FieldType
+	SchemaName *string `json:"x-amz-meta-schema-name"`
+	TableName  *string `json:"x-amz-meta-table-name"`
+	FieldNames *string `json:"x-amz-meta-field-names"`
+	FieldTypes *string `json:"x-amz-meta-field-types"`
+	fields     map[string]FieldType
 }
 
 func newS3MetaData(schema, table string, fields map[string]FieldType) *S3MetaData {
-	var fieldNames []string
-	var fieldTypes []FieldType
-	for k, v := range fields {
-		fieldNames = append(fieldNames, k)
-		fieldTypes = append(fieldTypes, v)
-	}
 	return &S3MetaData{
-		SchemaName:    &schema,
-		TableName:     &table,
-		fieldNamesArr: fieldNames,
-		fieldTypesArr: fieldTypes,
+		SchemaName: &schema,
+		TableName:  &table,
+		fields:     fields,
 	}
 }
 
@@ -66,8 +58,7 @@ func NewS3MetaDataFromSDKMap(metadata map[string]*string) (*S3MetaData, error) {
 	if err := json.Unmarshal(b, &m); err != nil {
 		return nil, err
 	}
-	m.buildFieldNames()
-	m.buildFieldTypes()
+	m.buildFields()
 	if err := m.validate(); err != nil {
 		return nil, err
 	}
@@ -77,8 +68,7 @@ func NewS3MetaDataFromSDKMap(metadata map[string]*string) (*S3MetaData, error) {
 
 // ConvertToS3SDKFormat converts the S3MetaData to the map expected by the S3 sdk
 func (m *S3MetaData) ConvertToS3SDKFormat() (map[string]*string, error) {
-	m.fieldNamesToString()
-	m.fieldTypesToString()
+	m.fieldsToStrings()
 	if err := m.validate(); err != nil {
 		return nil, err
 	}
@@ -102,10 +92,10 @@ func (m *S3MetaData) validate() error {
 	if m.TableName == nil {
 		return fmt.Errorf(invalidFieldErrorTemplate, "table name")
 	}
-	if m.FieldNames == nil || len(m.fieldNamesArr) == 0 {
+	if m.FieldNames == nil || len(m.fields) == 0 {
 		return fmt.Errorf(invalidFieldErrorTemplate, "field types")
 	}
-	if m.FieldTypes == nil || len(m.fieldTypesArr) == 0 {
+	if m.FieldTypes == nil {
 		return fmt.Errorf(invalidFieldErrorTemplate, "field types")
 	}
 
@@ -116,38 +106,31 @@ func (m *S3MetaData) validate() error {
 	return nil
 }
 
-// []string -> *string
-func (m *S3MetaData) fieldNamesToString() {
-	s := strings.Join(m.fieldNamesArr, comma)
-	m.FieldNames = &s
-}
+func (m *S3MetaData) fieldsToStrings() {
+	var fieldNames []string
+	var fieldTypes []string
 
-// []FieldTypes -> *string
-func (m *S3MetaData) fieldTypesToString() {
-	strTypes := make([]string, len(m.fieldTypesArr))
-	for idx, elem := range m.fieldTypesArr {
-		strTypes[idx] = string(elem)
+	for k, v := range m.fields {
+		fieldNames = append(fieldNames, k)
+		fieldTypes = append(fieldTypes, string(v))
 	}
-	s := strings.Join(strTypes, comma)
-	m.FieldTypes = &s
+
+	names := strings.Join(fieldNames, comma)
+	m.FieldNames = &names
+
+	types := strings.Join(fieldTypes, comma)
+	m.FieldTypes = &types
 }
 
-// *string -> []string
-func (m *S3MetaData) buildFieldNames() {
-	if m.FieldNames == nil {
+func (m *S3MetaData) buildFields() {
+	if m.FieldNames == nil || m.FieldTypes == nil {
 		return
 	}
-	m.fieldNamesArr = strings.Split(*m.FieldNames, comma)
-}
+	fieldNamesArr := strings.Split(*m.FieldNames, comma)
+	fieldTypesArr := strings.Split(*m.FieldTypes, comma)
+	m.fields = make(map[string]FieldType)
 
-// *string -> []FieldTypes
-func (m *S3MetaData) buildFieldTypes() {
-	if m.FieldTypes == nil {
-		return
-	}
-
-	types := strings.Split(*m.FieldTypes, comma)
-	for _, t := range types {
-		m.fieldTypesArr = append(m.fieldTypesArr, FieldType(t))
+	for idx, fieldName := range fieldNamesArr {
+		m.fields[fieldName] = FieldType(fieldTypesArr[idx])
 	}
 }

@@ -18,6 +18,7 @@ var (
 	testTable     = "table"
 	testFieldID   = "id"
 	testFieldType = "string"
+	testFields    = map[string]FieldType{testFieldID: String}
 )
 
 func TestNewS3MetaDataFromMap(t *testing.T) {
@@ -36,12 +37,11 @@ func TestNewS3MetaDataFromMap(t *testing.T) {
 				mFieldTypes: &testFieldType,
 			},
 			want: &S3MetaData{
-				SchemaName:    &testSchema,
-				TableName:     &testTable,
-				FieldNames:    &testFieldID,
-				FieldTypes:    &testFieldType,
-				fieldNamesArr: []string{testFieldID},
-				fieldTypesArr: []FieldType{String},
+				SchemaName: &testSchema,
+				TableName:  &testTable,
+				FieldNames: &testFieldID,
+				FieldTypes: &testFieldType,
+				fields:     testFields,
 			},
 		},
 	}
@@ -71,7 +71,7 @@ func TestS3MetaData_ConvertToS3SDKFormat(t *testing.T) {
 			args: args{
 				table:  testTable,
 				schema: testSchema,
-				fields: map[string]FieldType{testFieldID: String},
+				fields: testFields,
 			},
 			want: map[string]*string{
 				mSchema:     &testSchema,
@@ -116,32 +116,22 @@ func TestS3MetaData_validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "no field name arr",
+			name: "no field type",
 			metadata: &S3MetaData{
 				SchemaName: &testSchema,
 				TableName:  &testTable,
 				FieldNames: &testFieldID,
+				fields:     testFields,
 			},
 			wantErr: true,
 		},
 		{
-			name: "no field type",
+			name: "no fields map",
 			metadata: &S3MetaData{
-				SchemaName:    &testSchema,
-				TableName:     &testTable,
-				FieldNames:    &testFieldID,
-				fieldNamesArr: []string{testFieldID},
-			},
-			wantErr: true,
-		},
-		{
-			name: "no field type arr",
-			metadata: &S3MetaData{
-				SchemaName:    &testSchema,
-				TableName:     &testTable,
-				FieldNames:    &testFieldID,
-				FieldTypes:    &testFieldType,
-				fieldNamesArr: []string{testFieldID},
+				SchemaName: &testSchema,
+				TableName:  &testTable,
+				FieldNames: &testFieldID,
+				FieldTypes: &testFieldType,
 			},
 			wantErr: true,
 		},

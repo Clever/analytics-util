@@ -27,18 +27,18 @@ const (
 // See User-Defined metadata in:
 // https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetaData.html#object-metadata
 type S3MetaData struct {
-	SchemaName *string `json:"x-amz-meta-schema-name"`
-	TableName  *string `json:"x-amz-meta-table-name"`
-	FieldNames *string `json:"x-amz-meta-field-names"`
-	FieldTypes *string `json:"x-amz-meta-field-types"`
-	fields     map[string]FieldType
+	SchemaName *string              `json:"x-amz-meta-schema-name"`
+	TableName  *string              `json:"x-amz-meta-table-name"`
+	FieldNames *string              `json:"x-amz-meta-field-names"`
+	FieldTypes *string              `json:"x-amz-meta-field-types"`
+	Fields     map[string]FieldType `json:"-"`
 }
 
 func newS3MetaData(schema, table string, fields map[string]FieldType) *S3MetaData {
 	return &S3MetaData{
 		SchemaName: &schema,
 		TableName:  &table,
-		fields:     fields,
+		Fields:     fields,
 	}
 }
 
@@ -92,7 +92,7 @@ func (m *S3MetaData) validate() error {
 	if m.TableName == nil {
 		return fmt.Errorf(invalidFieldErrorTemplate, "table name")
 	}
-	if m.FieldNames == nil || len(m.fields) == 0 {
+	if m.FieldNames == nil || len(m.Fields) == 0 {
 		return fmt.Errorf(invalidFieldErrorTemplate, "field names")
 	}
 	if m.FieldTypes == nil {
@@ -110,7 +110,7 @@ func (m *S3MetaData) fieldsToStrings() {
 	var fieldNames []string
 	var fieldTypes []string
 
-	for k, v := range m.fields {
+	for k, v := range m.Fields {
 		fieldNames = append(fieldNames, k)
 		fieldTypes = append(fieldTypes, string(v))
 	}
@@ -128,9 +128,9 @@ func (m *S3MetaData) buildFields() {
 	}
 	fieldNamesArr := strings.Split(*m.FieldNames, comma)
 	fieldTypesArr := strings.Split(*m.FieldTypes, comma)
-	m.fields = make(map[string]FieldType)
+	m.Fields = make(map[string]FieldType)
 
 	for idx, fieldName := range fieldNamesArr {
-		m.fields[fieldName] = FieldType(fieldTypesArr[idx])
+		m.Fields[fieldName] = FieldType(fieldTypesArr[idx])
 	}
 }

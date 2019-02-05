@@ -93,19 +93,19 @@ func TestS3MetaData_validate(t *testing.T) {
 	tests := []struct {
 		name     string
 		metadata *S3MetaData
-		wantErr  bool
+		wantErr  string
 	}{
 		{
 			name:     "no schema",
 			metadata: &S3MetaData{},
-			wantErr:  true,
+			wantErr:  "schema",
 		},
 		{
 			name: "no table",
 			metadata: &S3MetaData{
 				SchemaName: &testSchema,
 			},
-			wantErr: true,
+			wantErr: "table",
 		},
 		{
 			name: "no field name",
@@ -113,7 +113,7 @@ func TestS3MetaData_validate(t *testing.T) {
 				SchemaName: &testSchema,
 				TableName:  &testTable,
 			},
-			wantErr: true,
+			wantErr: "field name",
 		},
 		{
 			name: "no field type",
@@ -123,7 +123,7 @@ func TestS3MetaData_validate(t *testing.T) {
 				FieldNames: &testFieldID,
 				fields:     testFields,
 			},
-			wantErr: true,
+			wantErr: "field type",
 		},
 		{
 			name: "no fields map",
@@ -133,13 +133,28 @@ func TestS3MetaData_validate(t *testing.T) {
 				FieldNames: &testFieldID,
 				FieldTypes: &testFieldType,
 			},
-			wantErr: true,
+			wantErr: "field names",
+		},
+		{
+			name: "field names and field types mismatch",
+			metadata: &S3MetaData{
+				SchemaName: &testSchema,
+				TableName:  &testTable,
+				FieldNames: testStrPtr("id,doesnt_exist"),
+				FieldTypes: &testFieldType,
+				fields:     testFields,
+			},
+			wantErr: "mismatch",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.metadata.validate()
-			require.Equal(t, tt.wantErr, err != nil)
+			require.Contains(t, err.Error(), tt.wantErr)
 		})
 	}
+}
+
+func testStrPtr(s string) *string {
+	return &s
 }

@@ -93,7 +93,7 @@ func (m *S3MetaData) validate() error {
 		return fmt.Errorf(invalidFieldErrorTemplate, "table name")
 	}
 	if m.FieldNames == nil || len(m.fields) == 0 {
-		return fmt.Errorf(invalidFieldErrorTemplate, "field types")
+		return fmt.Errorf(invalidFieldErrorTemplate, "field names")
 	}
 	if m.FieldTypes == nil {
 		return fmt.Errorf(invalidFieldErrorTemplate, "field types")

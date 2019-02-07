@@ -3,6 +3,7 @@ package metadata
 import (
 	"testing"
 
+	"github.com/Clever/firehose-management-worker/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -157,4 +158,68 @@ func TestS3MetaData_validate(t *testing.T) {
 
 func testStrPtr(s string) *string {
 	return &s
+}
+
+func TestS3MetaData_ConvertToRedshiftTableConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		meta    *S3MetaData
+		want    config.Config
+		wantErr bool
+	}{
+		{
+			name: "check all supported types",
+			meta: newS3MetaData(testSchema, testTable, map[string]FieldType{
+				"bool":  Boolean,
+				"int":   Integer,
+				"mongo": MongoID,
+				"str":   String,
+				"ts":    Timestamp,
+			}),
+			want: config.Config{
+				RedshiftSchema: testSchema,
+				RedshiftTable:  testTable,
+				Columns: []config.Column{
+					config.Column{
+						ColumnName: "bool",
+						ColumnType: redshiftBooleanType,
+					},
+					config.Column{
+						ColumnName: "int",
+						ColumnType: redshiftIntegerType,
+					},
+					config.Column{
+						ColumnName: "mongo",
+						ColumnType: redshiftMongoIDType,
+					},
+					config.Column{
+						ColumnName: "str",
+						ColumnType: redshiftStringType,
+					},
+					config.Column{
+						ColumnName: "ts",
+						ColumnType: redshiftTimestampType,
+					},
+				},
+			},
+		},
+		{
+			name: "unsupported type",
+			meta: newS3MetaData(testSchema, testTable, map[string]FieldType{
+				"tryingto": FieldType("bamboozle"),
+			}),
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.meta.ConvertToRedshiftTableConfig()
+			require.Equal(t, tt.want.RedshiftSchema, got.RedshiftSchema)
+			require.Equal(t, tt.want.RedshiftTable, got.RedshiftTable)
+			for _, column := range tt.want.Columns {
+				require.Contains(t, got.Columns, column)
+			}
+			require.Equal(t, tt.wantErr, err != nil)
+		})
+	}
 }

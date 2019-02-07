@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/Clever/firehose-management-worker/config"
 )
 
 const (
@@ -21,6 +23,15 @@ const (
 	MongoID   FieldType = "mongo_id"
 	String    FieldType = "string"
 	Timestamp FieldType = "timestamp"
+)
+
+// convenience variables for redshift
+const (
+	redshiftTimestampType = "timestamp"
+	redshiftStringType    = "varchar(256)"
+	redshiftIntegerType   = "integer"
+	redshiftBooleanType   = "boolean"
+	redshiftMongoIDType   = "char(24)"
 )
 
 // S3MetaData represents all the information we want to add to an analytics object for future reference
@@ -82,6 +93,44 @@ func (m *S3MetaData) ConvertToS3SDKFormat() (map[string]*string, error) {
 	}
 
 	return s, nil
+}
+
+// ConvertToRedshiftTableConfig converts the S3MetaData to a configuration object that can be
+// consumed by https://github.com/Clever/firehose-management-worker/blob/master/db/redshiftdb.go
+func (m *S3MetaData) ConvertToRedshiftTableConfig() (config.Config, error) {
+	m.fieldsToStrings()
+	if err := m.validate(); err != nil {
+		return config.Config{}, err
+	}
+	var columns []config.Column
+	for fieldName, fieldType := range m.Fields {
+		var normalizedType string
+		switch fieldType {
+		case Boolean:
+			normalizedType = redshiftBooleanType
+		case Integer:
+			normalizedType = redshiftIntegerType
+		case MongoID:
+			normalizedType = redshiftMongoIDType
+		case String:
+			normalizedType = redshiftStringType
+		case Timestamp:
+			normalizedType = redshiftTimestampType
+		default:
+			return config.Config{}, fmt.Errorf("unsupported data type detected: %s", fieldType)
+		}
+
+		columns = append(columns, config.Column{
+			ColumnName: fieldName,
+			ColumnType: normalizedType,
+		})
+	}
+
+	return config.Config{
+		RedshiftSchema: *m.SchemaName,
+		RedshiftTable:  *m.TableName,
+		Columns:        columns,
+	}, nil
 }
 
 // validate determines if we have a valid metadata configuration

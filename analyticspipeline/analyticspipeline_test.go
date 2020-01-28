@@ -31,6 +31,7 @@ func TestAnalyticsWorker(t *testing.T) {
 		collection   string
 		newCurrent   []byte
 		newRemaining []byte
+		newDone      bool
 	}{
 		{
 			context:      "normal case w/ flags",
@@ -38,6 +39,7 @@ func TestAnalyticsWorker(t *testing.T) {
 			district:     expectedDistrict,
 			newCurrent:   emptyCurrent,
 			newRemaining: emptyRemaining,
+			newDone:      true,
 		},
 		{
 			context: "missing required field",
@@ -54,6 +56,7 @@ func TestAnalyticsWorker(t *testing.T) {
 			district:     expectedDistrict,
 			newCurrent:   emptyCurrent,
 			newRemaining: emptyRemaining,
+			newDone:      true,
 		},
 		{
 			context:      "unwrapped json",
@@ -61,6 +64,7 @@ func TestAnalyticsWorker(t *testing.T) {
 			district:     expectedDistrict,
 			newCurrent:   emptyCurrent,
 			newRemaining: emptyRemaining,
+			newDone:      true,
 		},
 		{
 			context:      "json w/ all fields",
@@ -69,6 +73,7 @@ func TestAnalyticsWorker(t *testing.T) {
 			collection:   expectedCollection,
 			newCurrent:   emptyCurrent,
 			newRemaining: emptyRemaining,
+			newDone:      false,
 		},
 		{
 			context:      "json w/ remaining",
@@ -77,6 +82,7 @@ func TestAnalyticsWorker(t *testing.T) {
 			collection:   expectedCollection,
 			newCurrent:   []byte("{\"district_id\":\"abc456\"}"),
 			newRemaining: emptyRemaining,
+			newDone:      false,
 		},
 		{
 			context:      "json w/ remaining array",
@@ -85,6 +91,7 @@ func TestAnalyticsWorker(t *testing.T) {
 			collection:   expectedCollection,
 			newCurrent:   []byte("{\"district_id\":\"abc456\"}"),
 			newRemaining: []byte("[{\"district_id\":\"abc789\"}]"),
+			newDone:      false,
 		},
 		{
 			context: "empty JSON blob",
@@ -126,6 +133,7 @@ func TestAnalyticsWorker(t *testing.T) {
 			retrievedRemaining, err := json.Marshal(newPayload.Remanining)
 			assert.NoError(t, err, "Case '%s'", spec.context)
 			assert.Equal(t, spec.newRemaining, retrievedRemaining)
+			assert.Equal(t, spec.newDone, newPayload.Done)
 		} else {
 			assert.Equal(t, spec.err, err, "Case '%s'", spec.context)
 		}

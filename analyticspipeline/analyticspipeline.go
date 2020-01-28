@@ -33,6 +33,7 @@ var (
 type Payload struct {
 	Current    map[string]interface{}   `json:"current"`
 	Remanining []map[string]interface{} `json:"remaining"`
+	Done       bool                     `json:"done"`
 }
 
 // PrintPayload prints a passed in Payload
@@ -261,6 +262,8 @@ func AnalyticsWorker(configStruct interface{}) (*Payload, error) {
 	if len(analyticsPayload.Remanining) > 0 {
 		result.Current = analyticsPayload.Remanining[0]
 		result.Remanining = analyticsPayload.Remanining[1:]
+	} else {
+		result.Done = true
 	}
 
 	return &result, nil

@@ -9,7 +9,7 @@ $(eval $(call golang-version-check,1.13))
 
 export _DEPLOY_ENV=testing
 
-test: $(PKGS)
+test: generate $(PKGS)
 
 $(PKGS): golang-test-all-strict-deps
 	go generate $@
@@ -19,3 +19,7 @@ install_deps: golang-dep-vendor-deps
 	go get -u github.com/golang/mock/gomock
 	go get -u github.com/golang/mock/mockgen
 	$(call golang-dep-vendor)
+
+generate:
+	go generate ./...
+	go generate ./vendor/github.com/Clever/analytics-latency-config-service/gen-go/client

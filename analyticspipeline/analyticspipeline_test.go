@@ -1,6 +1,7 @@
 package analyticspipeline
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -9,6 +10,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	alcsWagClient "github.com/Clever/analytics-latency-config-service/gen-go/client"
+	alcs "github.com/Clever/analytics-latency-config-service/gen-go/models"
+	alcsHelpers "github.com/Clever/analytics-latency-config-service/helpers"
+	kvlogger "gopkg.in/Clever/kayvee-go.v6/logger"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
 const (
@@ -137,5 +145,110 @@ func TestAnalyticsWorker(t *testing.T) {
 		} else {
 			assert.Equal(t, spec.err, err, "Case '%s'", spec.context)
 		}
+	}
+}
+
+func floatPtr(f float64) *float64 {
+	return &f
+}
+
+func TestIsTableDataFresh(t *testing.T) {
+	for _, spec := range []struct {
+		description string
+		database    alcs.AnalyticsDatabase
+		schema      string
+		table       string
+		refresh     string
+		latency     *float64
+		queryError  error
+		isFresh     bool
+	}{
+		{
+			description: "indicates when fresh",
+			database:    alcs.AnalyticsDatabaseRedshiftFast,
+			schema:      "schema",
+			table:       "table",
+			refresh:     "10h",
+			latency:     floatPtr(5),
+			queryError:  nil,
+			isFresh:     true,
+		},
+		{
+			description: "indicates when stale",
+			database:    alcs.AnalyticsDatabaseRedshiftFast,
+			schema:      "schema",
+			table:       "table",
+			refresh:     "10h",
+			latency:     floatPtr(15),
+			queryError:  nil,
+			isFresh:     false,
+		},
+		{
+			description: "refreshes when no refresh set",
+			database:    alcs.AnalyticsDatabaseRedshiftFast,
+			schema:      "schema",
+			table:       "table",
+			refresh:     alcsHelpers.NoLatencyAlert,
+			latency:     floatPtr(5),
+			queryError:  nil,
+			isFresh:     false,
+		},
+		{
+			description: "refreshes when latency is unset",
+			database:    alcs.AnalyticsDatabaseRedshiftFast,
+			schema:      "schema",
+			table:       "table",
+			refresh:     "10h",
+			latency:     nil,
+			queryError:  nil,
+			isFresh:     false,
+		},
+		{
+			description: "refreshes when alcs errors",
+			database:    alcs.AnalyticsDatabaseRedshiftFast,
+			schema:      "schema",
+			table:       "table",
+			refresh:     "10h",
+			latency:     floatPtr(5),
+			queryError:  fmt.Errorf("connection error"),
+			isFresh:     false,
+		},
+		{
+			description: "refreshes when threshold is invalid (though it shouldn't happen)",
+			database:    alcs.AnalyticsDatabaseRedshiftFast,
+			schema:      "schema",
+			table:       "table",
+			refresh:     "10j",
+			latency:     floatPtr(5),
+			queryError:  fmt.Errorf("connection error"),
+			isFresh:     false,
+		},
+	} {
+		mockCtrl := gomock.NewController(t)
+		mockALCS := alcsWagClient.NewMockClient(mockCtrl)
+		mockLogger := kvlogger.NewMockCountLogger("fresh-test")
+		defer mockCtrl.Finish()
+
+		latencyResp := &alcs.GetTableLatencyResponse{
+			Database: spec.database,
+			Schema:   &spec.schema,
+			Table:    &spec.table,
+			Latency:  spec.latency,
+			Thresholds: &alcs.Thresholds{
+				Refresh: spec.refresh,
+			},
+		}
+		if spec.queryError != nil {
+			latencyResp = nil
+		}
+
+		mockALCS.EXPECT().GetTableLatency(context.TODO(), &alcs.GetTableLatencyRequest{
+			Database: spec.database,
+			Schema:   &spec.schema,
+			Table:    &spec.table,
+		}).Return(latencyResp, spec.queryError)
+
+		fresh := IsTableDataFresh(mockLogger, mockALCS, spec.database, spec.schema, spec.table)
+		assert.Equal(t, spec.isFresh, fresh)
 	}
 }

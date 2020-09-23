@@ -2,6 +2,7 @@ package analyticspipeline
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -9,6 +10,11 @@ import (
 	"os"
 	"reflect"
 	"strings"
+
+	alcsWagClient "github.com/Clever/analytics-latency-config-service/gen-go/client"
+	alcs "github.com/Clever/analytics-latency-config-service/gen-go/models"
+	alcsHelpers "github.com/Clever/analytics-latency-config-service/helpers"
+	kvlogger "gopkg.in/Clever/kayvee-go.v6/logger"
 )
 
 const (
@@ -292,4 +298,59 @@ func attemptUnwrappedPayload(configFlags *flag.FlagSet, config reflect.Value) er
 		}
 	}
 	return nil
+}
+
+// IsTableDataFresh checks with ALCS to see if the table data is fresh.
+// Any errors result in a log + "the data is not fresh" to fail gracefully.
+func IsTableDataFresh(
+	logger kvlogger.KayveeLogger,
+	alcsClient alcsWagClient.Client,
+	database alcs.AnalyticsDatabase,
+	schema string,
+	table string,
+) bool {
+	logPayload := kvlogger.M{
+		"database": database,
+		"schema":   schema,
+		"table":    table,
+	}
+
+	latency, err := alcsClient.GetTableLatency(context.TODO(), &alcs.GetTableLatencyRequest{
+		Database: database,
+		Schema:   &schema,
+		Table:    &table,
+	})
+
+	if err != nil {
+		// If we get an error, assume latency check fails, and run the job.
+		logPayload["error"] = err
+		logger.InfoD("latency-debounce-error", logPayload)
+		return false
+	} else if latency.Latency == nil {
+		// No latency returned means that we should run the job.
+		logPayload["threshold"] = latency.Thresholds.Refresh
+		logPayload["latency"] = "not found"
+		logger.InfoD("latency-debounce-empty", logPayload)
+		return false
+	} else if latency.Thresholds.Refresh == alcsHelpers.NoLatencyAlert {
+		// No refresh latency specified means that we should run the job.
+		logPayload["threshold"] = "none"
+		logPayload["latency"] = *latency.Latency
+		logger.InfoD("latency-debounce-unset", logPayload)
+		return false
+	} else {
+		crossed, threshold, err := alcsHelpers.CheckThresholdCrossed(*latency.Latency, latency.Thresholds, alcs.ThresholdTierRefresh)
+		logPayload["threshold"] = threshold
+		logPayload["latency"] = *latency.Latency
+
+		// Again, if we had an error, fall back to running the job
+		if err == nil && !crossed {
+			// We don't need to run the task. Bail out early.
+			logger.InfoD("latency-debounce-fresh", logPayload)
+			return true
+		}
+		// Otherwise, run the job
+		logger.InfoD("latency-debounce-stale", logPayload)
+		return false
+	}
 }

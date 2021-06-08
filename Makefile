@@ -4,7 +4,7 @@ include golang.mk
 .PHONY: test $(PKGS)
 SHELL := /bin/bash
 
-PKGS = $(shell go list ./...)
+PKGS = $(shell go list ./... | grep -v /vendor | grep -v /tools)
 $(eval $(call golang-version-check,1.13))
 
 export _DEPLOY_ENV=testing
@@ -15,10 +15,10 @@ $(PKGS): golang-test-all-strict-deps
 	go generate $@
 	$(call golang-test-all-strict,$@)
 
-install_deps: golang-dep-vendor-deps
+install_deps:
+	go mod vendor
 	go get -u github.com/golang/mock/gomock
 	go get -u github.com/golang/mock/mockgen
-	$(call golang-dep-vendor)
 
 generate:
 	go generate ./...
